@@ -21,7 +21,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Clone and setup
 git clone https://github.com/mett29/gemini-engineer.git
 cd gemini-engineer
-uv venv
+uv sync
 source .venv/bin/activate
 
 # Run web interface
