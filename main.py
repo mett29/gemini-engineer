@@ -1,7 +1,5 @@
-import os
 import asyncio
 
-from google import genai
 from dotenv import load_dotenv
 from nicegui import ui, app
 
@@ -15,62 +13,55 @@ load_dotenv()
 def main():
 
     cache = app.storage.client
-    cache['is_talking'] = False
     cache['talk_task'] = None
+    cache['chat_task'] = None
 
-    GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'not-set')
-    client = genai.Client(api_key=GOOGLE_API_KEY, http_options={"api_version": "v1alpha"})
-    model_id = "gemini-2.0-flash-exp"
-    config = {"response_modalities": ["TEXT"]}
+    if not cache['chat_task']:
+        gemini_engineer = GeminiEngineer(mode="TEXT")
+        event_loop = asyncio.get_event_loop()
+        chat_task = event_loop.create_task(gemini_engineer.chat())
+        cache['chat_task'] = chat_task
 
     def start_talking():
         try:
-            if cache['is_talking'] is True:
-                cache['is_talking'] = False
+            if cache['chat_task']:
+                cache['chat_task'].cancel()
+                cache['chat_task'] = None
+                cache.update({'chat_task': None})
+                ui.notify("Gemini chat task terminated.")
+            if cache['talk_task']:
                 talk_button.props("color='blue'")
-                talk_task = cache['talk_task']
-                if talk_task:
-                    talk_task.cancel()
+                cache['talk_task'].cancel()
+                cache.update({'talk_task': None})
                 ui.notify("Gemini talk task terminated.")
                 return
-            cache['is_talking'] = True
             talk_button.props("color='red'")
             mode = talk_mode.value
             gemini_engineer = GeminiEngineer(mode=mode)
             event_loop = asyncio.get_event_loop()
-            talk_task = event_loop.create_task(gemini_engineer.run(message_container))
+            talk_task = event_loop.create_task(gemini_engineer.talk(message_container))
             cache['talk_task'] = talk_task
             ui.notify("Gemini talk task started.")
-        except Exception:
-            ui.notify("Something went wrong connecting to Gemini, try again ...")
+        except Exception as ex:
+            print(str(ex))
+            ui.notify("Something went wrong connecting to Gemini, try again.")
             talk_button.props("color='blue'")
-            if talk_task:
-                talk_task.cancel()
+            if cache['talk_task']:
+                cache['talk_task'].cancel()
+            if cache['chat_task']:
+                cache['chat_task'].cancel()
 
-    async def send() -> None:
-        question = user_input.value
+    async def send_message() -> None:
+        user_message = user_input.value
         user_input.value = ''
-
         with message_container:
-            ui.chat_message(text=question, name='You', sent=True)
+            ui.chat_message(text=user_message, name='You', sent=True)
             response_message = ui.chat_message(name='Gemini', sent=False)
-            spinner = ui.spinner(type='dots')
+        if gemini_engineer:
+            await gemini_engineer.send_message(user_message, response_message)
 
-        async with client.aio.live.connect(model=model_id, config=config) as session:
-            message = question
-            print("> ", message, "\n")
-            await session.send(message, end_of_turn=True)
 
-            response = ''
-            async for chunk in session.receive():
-                if chunk.text:
-                    response += chunk.text
-                response_message.clear()
-                with response_message:
-                    ui.html(content=response)
-                ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
-            message_container.remove(spinner)
-
+    # FRONT-END TEMPLATE:
     ui.add_css(r'a:link, a:visited {color: inherit !important; text-decoration: none; font-weight: 500}')
 
     ui.query('.q-page').classes('flex')
@@ -85,10 +76,9 @@ def main():
         with ui.row().classes('w-full no-wrap items-center'):
             talk_button = ui.button(on_click=start_talking, icon="mic").props("color='blue'")
             talk_mode = ui.select(options=['TEXT', 'AUDIO'], value="TEXT", label="mode")
-            placeholder = 'message' if GOOGLE_API_KEY != 'not-set' else \
-                'Please provide your Gemini API key in the Python script first!'
+            placeholder = 'message'
             user_input = ui.input(placeholder=placeholder).props('rounded outlined input-class=mx-3') \
-                .classes('w-full self-center').on('keydown.enter', send)
+                .classes('w-full self-center').on('keydown.enter', send_message)
         ui.markdown('built with [NiceGUI](https://nicegui.io) and Gemini') \
             .classes('text-xs self-end mr-8 m-[-1em] text-primary')
 

@@ -108,7 +108,7 @@ class GeminiEngineer:
             await asyncio.to_thread(stream.write, np.frombuffer(bytestream, dtype=np.int16))
 
 
-    async def run(self, message_container = None):
+    async def talk(self, message_container = None):
         try:
             async with (
                 self.client.aio.live.connect(model=self.model, config=self.model_config) as session,
@@ -137,6 +137,40 @@ class GeminiEngineer:
         finally:
             if self.audio_stream:
                 self.audio_stream.close()
+
+
+    async def keep_session_alive(self):
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except Exception as ex:
+            print(f"Error during session: {ex}")
+
+
+    async def chat(self):
+        try:
+            async with self.client.aio.live.connect(model=self.model, config=self.model_config) as session:
+                self.session = session
+                print("Connected to session.")
+                await self.keep_session_alive()
+        except Exception as ex:
+            print(str(ex))
+            raise asyncio.CancelledError("Cannot connect to session, try again.")
+
+
+    async def send_message(self, text: str, response_message):
+        if self.session:
+            await self.session.send(text, end_of_turn=True)
+            response = ''
+            async for chunk in self.session.receive():
+                if chunk.text:
+                    response += chunk.text
+                response_message.clear()
+                with response_message:
+                    ui.html(content=response)
+                ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
+        else:
+            print("Session not initialized yet.")
 
 
 
