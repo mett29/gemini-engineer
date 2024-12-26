@@ -9,6 +9,8 @@ import sounddevice as sd
 from google import genai
 from nicegui import ui
 
+from src.config import SYSTEM_INSTRUCTION
+
 
 load_dotenv()
 
@@ -26,7 +28,10 @@ class GeminiEngineer:
         # Model settings
         self.mode = mode
         self.model = "models/gemini-2.0-flash-exp"
-        self.model_config = {"generation_config": {"response_modalities": [self.mode]}}
+        self.model_config = {
+            "generation_config": {"response_modalities": [self.mode]},
+            "system_instruction": SYSTEM_INSTRUCTION,
+        }
         GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
         self.client = genai.Client(api_key=GOOGLE_API_KEY, http_options={"api_version": "v1alpha"})
 
