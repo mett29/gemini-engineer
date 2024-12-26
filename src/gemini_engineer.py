@@ -173,7 +173,7 @@ class GeminiEngineer:
                     response += chunk.text
                 response_message.clear()
                 with response_message:
-                    ui.html(content=response)
+                    ui.markdown(content=response)
                 ui.run_javascript('window.scrollTo(0, document.body.scrollHeight)')
         else:
             print("Session not initialized yet.")
