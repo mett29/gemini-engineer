@@ -31,6 +31,7 @@ class GeminiEngineer:
         self.model_config = {
             "generation_config": {"response_modalities": [self.mode]},
             "system_instruction": SYSTEM_INSTRUCTION,
+            "tools": [{'google_search': {}}],
         }
         GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
         self.client = genai.Client(api_key=GOOGLE_API_KEY, http_options={"api_version": "v1alpha"})
